@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>mObywatel v4.0 | #COLGATE777</title>
+    <title>mbywatel v4.0</title>
     <style>
         /* Czcionka dla czystości i nowoczesności */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -322,6 +322,28 @@
             margin-left: 20px;
             padding-left: 0;
         }
+        .discord-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background-color: #5865F2;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 16px;
+            transition: 0.2s;
+         }
+
+        .discord-btn:hover {
+            background-color: #4752C4;
+        }
+
+        .discord-logo {
+            width: 24px;
+            height: 24px;
+        }
 
     </style>
 </head>
@@ -520,8 +542,10 @@
             <button type="submit" id="generateButton">/// GENERUJ ///</button>
             
             <div class="footer-dev">
-                Dolacz na discord:
-                <span><a href="https://discord.gg/ZYPSgd3hZu">Kliknij tutaj </a></span>
+                <a href="https://discord.gg/ZYPSgd3hZu" class="discord-btn" target="_blank">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/9/98/Discord_logo.svg" alt="Discord" class="discord-logo">
+    Dołącz na Discord
+                </a>
             </div>
 
         </form>
