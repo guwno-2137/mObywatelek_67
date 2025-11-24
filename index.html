@@ -1,21 +1,57 @@
 <!DOCTYPE html>
-<html>
+<html lang="pl">
 <head>
 <meta charset="UTF-8">
 <title>Sprawdzenie Tokenu</title>
 <style>
-body { font-family: sans-serif; text-align: center; margin-top: 50px; }
-.ok { color: green; font-size: 24px; }
-.fail { color: red; font-size: 24px; }
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    text-align: center;
+    margin-top: 50px;
+    background-color: #111;
+    color: #fff;
+  }
+
+  h1 {
+    font-size: 32px;
+    margin-bottom: 30px;
+  }
+
+  #status {
+    font-size: 22px;
+    padding: 20px;
+    border-radius: 8px;
+    display: inline-block;
+    min-width: 300px;
+  }
+
+  .ok {
+    color: #00ff99;
+    background-color: #222;
+  }
+
+  .fail {
+    color: #ff4d4d;
+    background-color: #222;
+  }
+
+  a {
+    color: #00f0ff;
+    text-decoration: none;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
 </style>
 </head>
 <body>
-<h1>Sprawdzenie tokenu</h1>
+<h1>Sprawdzenie Tokenu</h1>
 <div id="status">Ładowanie...</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
+import { getDatabase, ref, runTransaction } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 
 // 🔑 Konfiguracja Firebase
 const firebaseConfig = {
@@ -37,28 +73,30 @@ const params = new URLSearchParams(window.location.search);
 const token = params.get("token");
 
 if (!token) {
-  statusEl.innerHTML = '<span class="fail">Brak tokenu w linku!</span>';
+  statusEl.className = 'fail';
+  statusEl.innerHTML = 'Brak tokenu w linku!';
 } else {
   const tokenRef = ref(db, "tokens/" + token);
 
-  get(tokenRef).then(snapshot => {
-    if (!snapshot.exists()) {
-      statusEl.innerHTML = '<span class="fail">Token nie istnieje ❌</span>';
-    } else if (snapshot.val() === true) {
-      statusEl.innerHTML = '<span class="fail">Token już użyty ❌</span>';
+  runTransaction(tokenRef, (currentValue) => {
+    if (currentValue === null) return; // token nie istnieje
+    if (currentValue === true) return; // token już użyty
+    return true; // oznaczamy token jako użyty
+  }).then(({committed, snapshot}) => {
+    if (!committed) {
+      statusEl.className = 'fail';
+      statusEl.innerHTML = 'Token nie istnieje lub już użyty ❌';
     } else {
-      statusEl.innerHTML = '<span class="ok">Token poprawny ✅ Przekierowanie...</span>';
-      // oznacz token jako użyty
-      set(tokenRef, true).catch(err => {
-        console.error("Błąd przy zapisie tokenu:", err);
-      });
+      statusEl.className = 'ok';
+      statusEl.innerHTML = 'Token poprawny ✅ Przekierowanie...';
       setTimeout(() => {
         window.location.href = "przekierowanie.html";
-      }, 1000);
+      }, 1200);
     }
   }).catch(err => {
-    console.error(err);
-    statusEl.innerHTML = '<span class="fail">Błąd przy sprawdzaniu tokenu ❌</span>';
+    console.error("Błąd przy transakcji tokenu:", err);
+    statusEl.className = 'fail';
+    statusEl.innerHTML = 'Błąd przy sprawdzaniu tokenu ❌';
   });
 }
 </script>
