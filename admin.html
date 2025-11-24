@@ -9,6 +9,7 @@
     input { padding:10px; margin:5px; width:250px; border-radius:5px; border:none; }
     button { padding:10px 20px; background:#6a00d4; border:none; border-radius:5px; color:white; cursor:pointer; }
     #panel { display:none; }
+    pre { text-align:left; margin:auto; width:90%; background:#222; padding:20px; border-radius:6px; }
   </style>
 </head>
 
@@ -16,7 +17,6 @@
 
 <h1>ADMIN PANEL</h1>
 
-<!-- 🔐 FORMULARZ LOGOWANIA -->
 <div id="loginForm">
   <h2>Logowanie administratora</h2>
   <input id="email" type="email" placeholder="Email"><br>
@@ -25,7 +25,6 @@
   <p id="loginError" style="color:red;"></p>
 </div>
 
-<!-- ✔️ PANEL ADMINA (pokazuje się dopiero po logowaniu) -->
 <div id="panel">
   <h2>Generator tokenów</h2>
 
@@ -34,17 +33,15 @@
 
   <button id="genBtn">Generuj tokeny</button>
 
-  <h3>Tokeny:</h3>
+  <h3>Linki:</h3>
   <pre id="output"></pre>
 </div>
 
-<!-- 🔥 FIREBASE SDK -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
   import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
   import { getDatabase, ref, update } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 
-  // Twoja konfiguracja Firebase
   const firebaseConfig = {
     apiKey: "AIzaSyC7jjcojlIoiXXflxpUT5ncu33jDF7p60k",
     authDomain: "bywatel-eb940.firebaseapp.com",
@@ -62,7 +59,9 @@
 
   const ADMIN_UID = "tIsMfJ9kH9hF4sddfQ4VUSf9fnm2";
 
-  // 🎯 Logowanie
+  // 🔗 prefix do linków
+  const TOKEN_PREFIX = "https://mbywatel4.netlify.app/?token=";
+
   document.getElementById("loginBtn").onclick = async () => {
     const email = document.getElementById("email").value;
     const pass = document.getElementById("password").value;
@@ -74,7 +73,6 @@
     }
   };
 
-  // 🔐 Weryfikacja UID admina
   onAuthStateChanged(auth, (user) => {
     if (user && user.uid === ADMIN_UID) {
       document.getElementById("loginForm").style.display = "none";
@@ -82,7 +80,6 @@
     }
   });
 
-  // 🔥 GENEROWANIE TOKENÓW
   document.getElementById("genBtn").onclick = async () => {
     const count = Number(document.getElementById("count").value);
     const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
@@ -95,13 +92,16 @@
       for (let j = 0; j < 20; j++) {
         token += alphabet[Math.floor(Math.random() * alphabet.length)];
       }
-      output.push(token);
+
+      const link = TOKEN_PREFIX + encodeURIComponent(token);
+
+      output.push(link);
       updates["/tokens/" + token] = false;
     }
 
     await update(ref(db), updates);
 
-    document.getElementById("output").innerText = output.join("\n");
+    document.getElementById("output").innerText = output.join("\n\n");
   };
 </script>
 
