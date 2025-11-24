@@ -1,183 +1,109 @@
 <!DOCTYPE html>
-<html>
+<html lang="pl">
 <head>
   <meta charset="UTF-8">
-  <title>Panel Admin - Tokeny Jednorazowe</title>
+  <title>Panel admina</title>
   <style>
-    body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
-    input, button { padding: 8px; margin: 6px 0; font-size: 14px; }
-    textarea { width:100%; height:160px; margin-top:10px; }
-    .small { font-size: 13px; color: #666; }
-    .links { white-space: pre-wrap; background:#f7f7f7; padding:10px; border-radius:6px; }
+    body { font-family: Arial; background: #111; color: #fff; text-align:center; }
+    #loginForm, #panel { margin-top: 50px; }
+    input { padding:10px; margin:5px; width:250px; border-radius:5px; border:none; }
+    button { padding:10px 20px; background:#6a00d4; border:none; border-radius:5px; color:white; cursor:pointer; }
+    #panel { display:none; }
   </style>
 </head>
+
 <body>
-  <h2>Admin: Generowanie tokenów jednorazowych</h2>
 
-  <label>Ile tokenów wygenerować?</label><br>
-  <input id="count" type="number" value="10" min="1" max="1000">
+<h1>ADMIN PANEL</h1>
 
-  <label>Długość tokenu</label><br>
-  <input id="length" type="number" value="20" min="8" max="64">
+<!-- 🔐 FORMULARZ LOGOWANIA -->
+<div id="loginForm">
+  <h2>Logowanie administratora</h2>
+  <input id="email" type="email" placeholder="Email"><br>
+  <input id="password" type="password" placeholder="Hasło"><br>
+  <button id="loginBtn">Zaloguj</button>
+  <p id="loginError" style="color:red;"></p>
+</div>
 
-  <label>Twój link (np. https://guwno-2137.github.io/mObywatelek_67?token=)</label><br>
-  <input id="prefix" type="text" value="https://mbywatel4.netlify.app/?token=" style="width:100%">
+<!-- ✔️ PANEL ADMINA (pokazuje się dopiero po logowaniu) -->
+<div id="panel">
+  <h2>Generator tokenów</h2>
 
-  <div style="margin-top:10px;">
-    <button id="genBtn" disabled>Generuj i zapisz w Firebase</button>
-    <button id="localBtn" disabled>Generuj lokalnie (nie zapisuje)</button>
-    <button id="csvBtn" disabled>Pobierz CSV</button>
-  </div>
+  <label>Ile tokenów wygenerować:</label><br>
+  <input id="count" value="10" type="number"><br><br>
 
-  <p class="small">Lista tokenów / linków:</p>
-  <div id="out" class="links">Brak</div>
+  <button id="genBtn">Generuj tokeny</button>
 
+  <h3>Tokeny:</h3>
+  <pre id="output"></pre>
+</div>
+
+<!-- 🔥 FIREBASE SDK -->
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-import { getDatabase, ref, update } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
+  import { getDatabase, ref, update } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 
-// === KONFIGURACJA ===
-const ADMIN_UID = "tIsMfJ9kH9hF4sddfQ4VUSf9fnm2";
-const ADMIN_EMAIL = "twojadmin@email.com"; // tutaj podaj email admina
-const ADMIN_PASSWORD = "TwojeSuperHaslo123"; // tutaj hasło admina
+  // Twoja konfiguracja Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyC7jjcojlIoiXXflxpUT5ncu33jDF7p60k",
+    authDomain: "bywatel-eb940.firebaseapp.com",
+    databaseURL: "https://bywatel-eb940-default-rtdb.firebaseio.com",
+    projectId: "bywatel-eb940",
+    storageBucket: "bywatel-eb940.firebasestorage.app",
+    messagingSenderId: "648437385966",
+    appId: "1:648437385966:web:96a58994f12d4d8c4f81ff",
+    measurementId: "G-0505X7DVGH"
+  };
 
-const firebaseConfig = {
-  apiKey: "AIzaSyC7jjcojlIoiXXflxpUT5ncu33jDF7p60k",
-  authDomain: "bywatel-eb940.firebaseapp.com",
-  databaseURL: "https://bywatel-eb940-default-rtdb.firebaseio.com",
-  projectId: "bywatel-eb940",
-  storageBucket: "bywatel-eb940.firebasestorage.app",
-  messagingSenderId: "648437385966",
-  appId: "1:648437385966:web:96a58994f12d4d8c4f81ff",
-  measurementId: "G-0505X7DVGH"
-};
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getDatabase(app);
 
-// --- INICJALIZACJA ---
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const auth = getAuth(app);
+  const ADMIN_UID = "tIsMfJ9kH9hF4sddfQ4VUSf9fnm2";
 
-// --- ELEMENTY DOM ---
-const countEl = document.getElementById("count");
-const lengthEl = document.getElementById("length");
-const prefixEl = document.getElementById("prefix");
-const outEl = document.getElementById("out");
-const genBtn = document.getElementById("genBtn");
-const localBtn = document.getElementById("localBtn");
-const csvBtn = document.getElementById("csvBtn");
+  // 🎯 Logowanie
+  document.getElementById("loginBtn").onclick = async () => {
+    const email = document.getElementById("email").value;
+    const pass = document.getElementById("password").value;
 
-let lastGenerated = [];
-
-// --- FUNKCJE GENEROWANIA TOKENÓW ---
-function randToken(len) {
-  const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
-  const arr = new Uint8Array(len);
-  crypto.getRandomValues(arr);
-  let s = "";
-  for (let i=0;i<len;i++){
-    s += alphabet[arr[i] % alphabet.length];
-  }
-  return s;
-}
-
-function renderList(list) {
-  if (list.length === 0) {
-    outEl.textContent = "Brak";
-    csvBtn.disabled = true;
-    return;
-  }
-  const lines = list.map((x,i)=> `${i+1}. ${x.token}   →   ${x.link}`);
-  outEl.textContent = lines.join("\n");
-  csvBtn.disabled = false;
-}
-
-function generateTokens(count, len, prefix) {
-  const set = new Set();
-  const arr = [];
-  while (arr.length < count) {
-    const t = randToken(len);
-    if (!set.has(t)) {
-      set.add(t);
-      arr.push({ token: t, link: prefix + encodeURIComponent(t) });
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch (e) {
+      document.getElementById("loginError").innerText = "Błąd logowania: " + e.message;
     }
-  }
-  return arr;
-}
+  };
 
-async function saveToFirebase(list) {
-  const updates = {};
-  list.forEach(item => {
-    updates['/tokens/' + item.token] = false;
-  });
-  await update(ref(db), updates);
-}
-
-// --- OBSŁUGA PRZYCISKÓW ---
-genBtn.addEventListener("click", async () => {
-  genBtn.disabled = true;
-  genBtn.textContent = "Generowanie...";
-  try {
-    const count = Math.min(1000, Math.max(1, Number(countEl.value) || 10));
-    const len = Math.min(64, Math.max(8, Number(lengthEl.value) || 20));
-    const prefix = (prefixEl.value || "").trim();
-    const list = generateTokens(count, len, prefix);
-    await saveToFirebase(list);
-    lastGenerated = list;
-    renderList(list);
-    genBtn.textContent = "Gotowe! Zapisano w Firebase";
-  } catch (e) {
-    console.error(e);
-    genBtn.textContent = "Błąd — sprawdź konsolę";
-    alert("Błąd przy zapisie do Firebase!");
-  } finally {
-    genBtn.disabled = false;
-    setTimeout(()=> genBtn.textContent = "Generuj i zapisz w Firebase", 2000);
-  }
-});
-
-localBtn.addEventListener("click", () => {
-  const count = Math.min(1000, Math.max(1, Number(countEl.value) || 10));
-  const len = Math.min(64, Math.max(8, Number(lengthEl.value) || 20));
-  const prefix = (prefixEl.value || "").trim();
-  const list = generateTokens(count, len, prefix);
-  lastGenerated = list;
-  renderList(list);
-});
-
-csvBtn.addEventListener("click", () => {
-  if (!lastGenerated || lastGenerated.length === 0) return;
-  let csv = "token,link\n";
-  lastGenerated.forEach(x => { csv += `${x.token},${x.link}\n`; });
-  const blob = new Blob([csv], {type: "text/csv;charset=utf-8;"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "tokens.csv";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-});
-
-// --- AUTOMATYCZNE LOGOWANIE ADMINA ---
-signInWithEmailAndPassword(auth, ADMIN_EMAIL, ADMIN_PASSWORD)
-  .catch(err => {
-    outEl.textContent = "Błąd logowania: " + err.message;
+  // 🔐 Weryfikacja UID admina
+  onAuthStateChanged(auth, (user) => {
+    if (user && user.uid === ADMIN_UID) {
+      document.getElementById("loginForm").style.display = "none";
+      document.getElementById("panel").style.display = "block";
+    }
   });
 
-// --- SPRAWDZENIE UID ---
-onAuthStateChanged(auth, user => {
-  if (user && user.uid === ADMIN_UID) {
-    genBtn.disabled = false;
-    localBtn.disabled = false;
-    outEl.textContent = "Zalogowano jako admin.";
-  } else {
-    genBtn.disabled = true;
-    localBtn.disabled = true;
-    outEl.textContent = "Zaloguj się jako admin, aby używać tego panelu.";
-  }
-});
+  // 🔥 GENEROWANIE TOKENÓW
+  document.getElementById("genBtn").onclick = async () => {
+    const count = Number(document.getElementById("count").value);
+    const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
+
+    const output = [];
+    const updates = {};
+
+    for (let i = 0; i < count; i++) {
+      let token = "";
+      for (let j = 0; j < 20; j++) {
+        token += alphabet[Math.floor(Math.random() * alphabet.length)];
+      }
+      output.push(token);
+      updates["/tokens/" + token] = false;
+    }
+
+    await update(ref(db), updates);
+
+    document.getElementById("output").innerText = output.join("\n");
+  };
 </script>
+
 </body>
 </html>
