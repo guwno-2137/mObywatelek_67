@@ -4,55 +4,55 @@
 <meta charset="UTF-8">
 <title>Panel Admin - Tokeny Jednorazowe</title>
 <style>
-  body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg,#1a1a1a,#111);
-    color: #fff;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 50px 20px;
-    min-height: 100vh;
-  }
-  h2 {
-    font-size: 2em;
-    margin-bottom: 20px;
-    text-shadow: 0 0 10px #6a00d4;
-  }
-  input[type=email], input[type=password], input[type=number], input[type=text] {
-    padding: 10px;
-    margin: 6px 0;
-    border-radius: 6px;
-    border: none;
-    width: 300px;
-    font-size: 16px;
-  }
-  button {
-    padding: 10px 25px;
-    margin: 5px;
-    background:#6a00d4;
-    border:none;
-    border-radius:8px;
-    color:white;
-    font-size: 16px;
-    cursor:pointer;
-    transition: 0.3s;
-  }
-  button:hover { background:#8500ff; }
-  .links {
-    margin-top: 20px;
-    width: 90%;
-    max-width: 700px;
-    background: #222;
-    padding: 20px;
-    border-radius: 12px;
-    white-space: pre-wrap;
-    box-shadow: 0 0 20px rgba(106,0,212,0.5);
-    font-size: 14px;
-  }
-  .small { font-size: 13px; color: #aaa; margin-top:10px; }
-  #panel { display:none; }
-  #loginError { color: #f33; margin-top:5px; }
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg,#1a1a1a,#111);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 50px 20px;
+  min-height: 100vh;
+}
+h2 { font-size: 2em; margin-bottom: 20px; text-shadow: 0 0 10px #6a00d4; text-align:center; }
+input[type=email], input[type=password], input[type=number], input[type=text] {
+  padding: 12px;
+  margin: 6px 0;
+  border-radius: 8px;
+  border: none;
+  width: 320px;
+  font-size: 18px;
+}
+button {
+  padding: 10px 25px;
+  margin: 5px;
+  background:#6a00d4;
+  border:none;
+  border-radius:8px;
+  color:white;
+  font-size: 16px;
+  cursor:pointer;
+  transition: 0.3s;
+}
+button:hover { background:#8500ff; }
+#panel { display:none; width:100%; max-width:700px; }
+.links { margin-top:20px; display:flex; flex-direction:column; gap:10px; }
+.link-item {
+  display:flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #222;
+  padding: 10px 15px;
+  border-radius: 12px;
+  font-size: 16px;
+  word-break: break-all;
+  box-shadow: 0 0 10px rgba(106,0,212,0.4);
+}
+.link-item button {
+  padding: 6px 12px;
+  font-size: 14px;
+}
+#loginError { color: #f33; margin-top:5px; font-size:16px; }
 </style>
 </head>
 <body>
@@ -67,25 +67,21 @@
 </div>
 
 <div id="panel">
-  <h2>Generowanie tokenów jednorazowych</h2>
-
+  <h2>Generowanie tokenów</h2>
   <label>Ile tokenów wygenerować?</label><br>
-  <input id="count" type="number" value="10" min="1" max="1000">
+  <input id="count" type="number" value="10" min="1" max="1000"><br>
 
   <label>Długość tokenu</label><br>
-  <input id="length" type="number" value="20" min="8" max="64">
+  <input id="length" type="number" value="20" min="8" max="64"><br>
 
   <label>Twój link</label><br>
-  <input id="prefix" type="text" value="https://m-obywatelek-67.vercel.app/index.html?token=" style="width:300px">
+  <input id="prefix" type="text" value="https://m-obywatelek-67.vercel.app/index.html?token=" style="width:320px"><br>
 
-  <div style="margin-top:15px;">
-    <button id="genBtn">Generuj i zapisz w Firebase</button>
-    <button id="localBtn">Generuj lokalnie</button>
-    <button id="csvBtn" disabled>Pobierz CSV</button>
-  </div>
+  <button id="genBtn">Generuj i zapisz w Firebase</button>
+  <button id="localBtn">Generuj lokalnie</button>
 
   <p class="small">Lista tokenów / linków:</p>
-  <div id="out" class="links">Brak</div>
+  <div id="out" class="links"></div>
 </div>
 
 <script type="module">
@@ -109,7 +105,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
-// === ELEMENTY DOM ===
+// --- ELEMENTY DOM ---
 const loginForm = document.getElementById("loginForm");
 const loginBtn = document.getElementById("loginBtn");
 const loginError = document.getElementById("loginError");
@@ -121,10 +117,9 @@ const prefixEl = document.getElementById("prefix");
 const outEl = document.getElementById("out");
 const genBtn = document.getElementById("genBtn");
 const localBtn = document.getElementById("localBtn");
-const csvBtn = document.getElementById("csvBtn");
 
 let lastGenerated = [];
-const ADMIN_UID = "tIsMfJ9kH9hF4sddfQ4VUSf9fnm2"; // Twój UID w Firebase Auth
+const ADMIN_UID = "tIsMfJ9kH9hF4sddfQ4VUSf9fnm2"; 
 
 // --- LOGOWANIE ---
 loginBtn.onclick = async () => {
@@ -132,20 +127,20 @@ loginBtn.onclick = async () => {
   const pass = document.getElementById("password").value;
   loginError.textContent = "";
   try {
-    await signInWithEmailAndPassword(auth, email, pass);
+    await signInWithEmailAndPassword(auth,email,pass);
   } catch(e){
     loginError.textContent = "Błąd logowania: " + e.message;
   }
 };
 
-onAuthStateChanged(auth, (user)=>{
+onAuthStateChanged(auth,(user)=>{
   if(user && user.uid===ADMIN_UID){
     loginForm.style.display="none";
     panel.style.display="block";
   }
 });
 
-// --- FUNKCJE GENEROWANIA TOKENÓW ---
+// --- TOKENY ---
 function randToken(len){
   const alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
   const arr=new Uint8Array(len);
@@ -153,13 +148,6 @@ function randToken(len){
   let s="";
   for(let i=0;i<len;i++){ s+=alphabet[arr[i]%alphabet.length]; }
   return s;
-}
-
-function renderList(list){
-  if(list.length===0){ outEl.textContent="Brak"; csvBtn.disabled=true; return; }
-  const lines=list.map((x,i)=>`${i+1}. ${x.token} → ${x.link}`);
-  outEl.textContent=lines.join("\n");
-  csvBtn.disabled=false;
 }
 
 function generateTokens(count,len,prefix){
@@ -180,7 +168,20 @@ async function saveToFirebase(list){
   list.forEach(item=>{
     updates['/tokens/'+item.token]={ value:item.token, used:false };
   });
-  await update(ref(db), updates);
+  await update(ref(db),updates);
+}
+
+function renderList(list){
+  outEl.innerHTML = "";
+  if(list.length===0) return;
+  list.forEach(item=>{
+    const div = document.createElement("div");
+    div.className="link-item";
+    div.innerHTML = `<span>${item.link}</span> <button>📋 Kopiuj</button>`;
+    const btn = div.querySelector("button");
+    btn.onclick = ()=>{ navigator.clipboard.writeText(item.link); btn.textContent="✅ Skopiowano"; setTimeout(()=>btn.textContent="📋 Kopiuj",1000);}
+    outEl.appendChild(div);
+  });
 }
 
 // --- OBSŁUGA PRZYCISKÓW ---
@@ -194,7 +195,7 @@ genBtn.addEventListener("click",async()=>{
     await saveToFirebase(list);
     lastGenerated=list;
     renderList(list);
-    genBtn.textContent="Gotowe! Zapisano w Firebase";
+    genBtn.textContent="Gotowe!";
   }catch(e){ console.error(e); alert("Błąd przy zapisie do Firebase!"); genBtn.textContent="Błąd";}
   finally{ genBtn.disabled=false; setTimeout(()=>genBtn.textContent="Generuj i zapisz w Firebase",2000);}
 });
@@ -207,17 +208,7 @@ localBtn.addEventListener("click",()=>{
   lastGenerated=list;
   renderList(list);
 });
-
-csvBtn.addEventListener("click",()=>{
-  if(!lastGenerated||lastGenerated.length===0)return;
-  let csv="token,link\n";
-  lastGenerated.forEach(x=>{ csv+=`${x.token},${x.link}\n`; });
-  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement("a");
-  a.href=url; a.download="tokens.csv"; document.body.appendChild(a);
-  a.click(); a.remove(); URL.revokeObjectURL(url);
-});
 </script>
+
 </body>
 </html>
