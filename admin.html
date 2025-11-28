@@ -1,18 +1,73 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Panel Admin - Tokeny Jednorazowe</title>
-  <style>
-    body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
-    input, button { padding: 8px; margin: 6px 0; font-size: 14px; }
-    textarea { width:100%; height:160px; margin-top:10px; }
-    .small { font-size: 13px; color: #666; }
-    .links { white-space: pre-wrap; background:#f7f7f7; padding:10px; border-radius:6px; }
-  </style>
+<meta charset="UTF-8">
+<title>Panel Admin - Tokeny Jednorazowe</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg,#1a1a1a,#111);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 50px 20px;
+    min-height: 100vh;
+  }
+  h2 {
+    font-size: 2em;
+    margin-bottom: 20px;
+    text-shadow: 0 0 10px #6a00d4;
+  }
+  input[type=email], input[type=password], input[type=number], input[type=text] {
+    padding: 10px;
+    margin: 6px 0;
+    border-radius: 6px;
+    border: none;
+    width: 300px;
+    font-size: 16px;
+  }
+  button {
+    padding: 10px 25px;
+    margin: 5px;
+    background:#6a00d4;
+    border:none;
+    border-radius:8px;
+    color:white;
+    font-size: 16px;
+    cursor:pointer;
+    transition: 0.3s;
+  }
+  button:hover { background:#8500ff; }
+  .links {
+    margin-top: 20px;
+    width: 90%;
+    max-width: 700px;
+    background: #222;
+    padding: 20px;
+    border-radius: 12px;
+    white-space: pre-wrap;
+    box-shadow: 0 0 20px rgba(106,0,212,0.5);
+    font-size: 14px;
+  }
+  .small { font-size: 13px; color: #aaa; margin-top:10px; }
+  #panel { display:none; }
+  #loginError { color: #f33; margin-top:5px; }
+</style>
 </head>
 <body>
-  <h2>Admin: Generowanie tokenów jednorazowych</h2>
+
+<h2>Panel Admin - Logowanie</h2>
+
+<div id="loginForm">
+  <input id="email" type="email" placeholder="Email admina"><br>
+  <input id="password" type="password" placeholder="Hasło"><br>
+  <button id="loginBtn">Zaloguj</button>
+  <div id="loginError"></div>
+</div>
+
+<div id="panel">
+  <h2>Generowanie tokenów jednorazowych</h2>
 
   <label>Ile tokenów wygenerować?</label><br>
   <input id="count" type="number" value="10" min="1" max="1000">
@@ -20,23 +75,25 @@
   <label>Długość tokenu</label><br>
   <input id="length" type="number" value="20" min="8" max="64">
 
-  <label>Twój link (np. https://m-obywatelek-67.vercel.app/index.html?token=)</label><br>
-  <input id="prefix" type="text" value="https://m-obywatelek-67.vercel.app/index.html?token=" style="width:100%">
+  <label>Twój link</label><br>
+  <input id="prefix" type="text" value="https://m-obywatelek-67.vercel.app/index.html?token=" style="width:300px">
 
-  <div style="margin-top:10px;">
+  <div style="margin-top:15px;">
     <button id="genBtn">Generuj i zapisz w Firebase</button>
-    <button id="localBtn">Generuj lokalnie (nie zapisuje)</button>
+    <button id="localBtn">Generuj lokalnie</button>
     <button id="csvBtn" disabled>Pobierz CSV</button>
   </div>
 
   <p class="small">Lista tokenów / linków:</p>
   <div id="out" class="links">Brak</div>
+</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
 import { getDatabase, ref, update } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-database.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
 
-// === KONFIGURACJA FIREBASE (TA, Z KTÓREJ KORZYSTAŁ INDEX.HTML) ===
+// === KONFIG FIREBASE ===
 const firebaseConfig = {
   apiKey: "AIzaSyC7jjcojlIoiXXflxpUT5ncu33jDF7p60k",
   authDomain: "bywatel-eb940.firebaseapp.com",
@@ -50,8 +107,14 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const auth = getAuth(app);
 
-// --- ELEMENTY DOM ---
+// === ELEMENTY DOM ===
+const loginForm = document.getElementById("loginForm");
+const loginBtn = document.getElementById("loginBtn");
+const loginError = document.getElementById("loginError");
+const panel = document.getElementById("panel");
+
 const countEl = document.getElementById("count");
 const lengthEl = document.getElementById("length");
 const prefixEl = document.getElementById("prefix");
@@ -61,96 +124,99 @@ const localBtn = document.getElementById("localBtn");
 const csvBtn = document.getElementById("csvBtn");
 
 let lastGenerated = [];
+const ADMIN_UID = "tIsMfJ9kH9hF4sddfQ4VUSf9fnm2"; // Twój UID w Firebase Auth
 
-// --- FUNKCJE ---
-function randToken(len) {
-  const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
-  const arr = new Uint8Array(len);
-  crypto.getRandomValues(arr);
-  let s = "";
-  for (let i=0;i<len;i++){
-    s += alphabet[arr[i] % alphabet.length];
+// --- LOGOWANIE ---
+loginBtn.onclick = async () => {
+  const email = document.getElementById("email").value;
+  const pass = document.getElementById("password").value;
+  loginError.textContent = "";
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+  } catch(e){
+    loginError.textContent = "Błąd logowania: " + e.message;
   }
+};
+
+onAuthStateChanged(auth, (user)=>{
+  if(user && user.uid===ADMIN_UID){
+    loginForm.style.display="none";
+    panel.style.display="block";
+  }
+});
+
+// --- FUNKCJE GENEROWANIA TOKENÓW ---
+function randToken(len){
+  const alphabet="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-";
+  const arr=new Uint8Array(len);
+  crypto.getRandomValues(arr);
+  let s="";
+  for(let i=0;i<len;i++){ s+=alphabet[arr[i]%alphabet.length]; }
   return s;
 }
 
-function renderList(list) {
-  if (list.length === 0) {
-    outEl.textContent = "Brak";
-    csvBtn.disabled = true;
-    return;
-  }
-  const lines = list.map((x,i)=> `${i+1}. ${x.token}   →   ${x.link}`);
-  outEl.textContent = lines.join("\n");
-  csvBtn.disabled = false;
+function renderList(list){
+  if(list.length===0){ outEl.textContent="Brak"; csvBtn.disabled=true; return; }
+  const lines=list.map((x,i)=>`${i+1}. ${x.token} → ${x.link}`);
+  outEl.textContent=lines.join("\n");
+  csvBtn.disabled=false;
 }
 
-function generateTokens(count, len, prefix) {
-  const set = new Set();
-  const arr = [];
-  while (arr.length < count) {
-    const t = randToken(len);
-    if (!set.has(t)) {
+function generateTokens(count,len,prefix){
+  const set=new Set();
+  const arr=[];
+  while(arr.length<count){
+    const t=randToken(len);
+    if(!set.has(t)){
       set.add(t);
-      arr.push({ token: t, link: prefix + encodeURIComponent(t) });
+      arr.push({token:t,link:prefix+encodeURIComponent(t)});
     }
   }
   return arr;
 }
 
-async function saveToFirebase(list) {
-  const updates = {};
-  list.forEach(item => {
-    updates['/tokens/' + item.token] = { value: item.token, used: false }; // format zgodny z index.html
+async function saveToFirebase(list){
+  const updates={};
+  list.forEach(item=>{
+    updates['/tokens/'+item.token]={ value:item.token, used:false };
   });
   await update(ref(db), updates);
 }
 
 // --- OBSŁUGA PRZYCISKÓW ---
-genBtn.addEventListener("click", async () => {
-  genBtn.disabled = true;
-  genBtn.textContent = "Generowanie...";
-  try {
-    const count = Math.min(1000, Math.max(1, Number(countEl.value) || 10));
-    const len = Math.min(64, Math.max(8, Number(lengthEl.value) || 20));
-    const prefix = (prefixEl.value || "").trim();
-    const list = generateTokens(count, len, prefix);
+genBtn.addEventListener("click",async()=>{
+  genBtn.disabled=true; genBtn.textContent="Generowanie...";
+  try{
+    const count=Math.min(1000,Math.max(1,Number(countEl.value)||10));
+    const len=Math.min(64,Math.max(8,Number(lengthEl.value)||20));
+    const prefix=(prefixEl.value||"").trim();
+    const list=generateTokens(count,len,prefix);
     await saveToFirebase(list);
-    lastGenerated = list;
+    lastGenerated=list;
     renderList(list);
-    genBtn.textContent = "Gotowe! Zapisano w Firebase";
-  } catch (e) {
-    console.error(e);
-    genBtn.textContent = "Błąd — sprawdź konsolę";
-    alert("Błąd przy zapisie do Firebase!");
-  } finally {
-    genBtn.disabled = false;
-    setTimeout(()=> genBtn.textContent = "Generuj i zapisz w Firebase", 2000);
-  }
+    genBtn.textContent="Gotowe! Zapisano w Firebase";
+  }catch(e){ console.error(e); alert("Błąd przy zapisie do Firebase!"); genBtn.textContent="Błąd";}
+  finally{ genBtn.disabled=false; setTimeout(()=>genBtn.textContent="Generuj i zapisz w Firebase",2000);}
 });
 
-localBtn.addEventListener("click", () => {
-  const count = Math.min(1000, Math.max(1, Number(countEl.value) || 10));
-  const len = Math.min(64, Math.max(8, Number(lengthEl.value) || 20));
-  const prefix = (prefixEl.value || "").trim();
-  const list = generateTokens(count, len, prefix);
-  lastGenerated = list;
+localBtn.addEventListener("click",()=>{
+  const count=Math.min(1000,Math.max(1,Number(countEl.value)||10));
+  const len=Math.min(64,Math.max(8,Number(lengthEl.value)||20));
+  const prefix=(prefixEl.value||"").trim();
+  const list=generateTokens(count,len,prefix);
+  lastGenerated=list;
   renderList(list);
 });
 
-csvBtn.addEventListener("click", () => {
-  if (!lastGenerated || lastGenerated.length === 0) return;
-  let csv = "token,link\n";
-  lastGenerated.forEach(x => { csv += `${x.token},${x.link}\n`; });
-  const blob = new Blob([csv], {type: "text/csv;charset=utf-8;"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "tokens.csv";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+csvBtn.addEventListener("click",()=>{
+  if(!lastGenerated||lastGenerated.length===0)return;
+  let csv="token,link\n";
+  lastGenerated.forEach(x=>{ csv+=`${x.token},${x.link}\n`; });
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download="tokens.csv"; document.body.appendChild(a);
+  a.click(); a.remove(); URL.revokeObjectURL(url);
 });
 </script>
 </body>
