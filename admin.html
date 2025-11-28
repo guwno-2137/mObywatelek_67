@@ -41,6 +41,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebas
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
 import { getDatabase, ref, update } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 
+// 🔑 Konfiguracja Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyC7jjcojlIoiXXflxpUT5ncu33jDF7p60k",
   authDomain: "bywatel-eb940.firebaseapp.com",
@@ -56,9 +57,12 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getDatabase(app);
 
+// UID admina z Firebase Auth
 const ADMIN_UID = "tIsMfJ9kH9hF4sddfQ4VUSf9fnm2";
-const TOKEN_PREFIX = "https://twoja-strona.vercel.app/index.html?token=";
+// Twój link Vercel z parametrem token
+const TOKEN_PREFIX = "https://m-obywatelek-67.vercel.app/index.html?token=";
 
+// Logowanie admina
 document.getElementById("loginBtn").onclick = async () => {
   const email = document.getElementById("email").value;
   const pass = document.getElementById("password").value;
@@ -70,6 +74,7 @@ document.getElementById("loginBtn").onclick = async () => {
   }
 };
 
+// Pokaż panel po zalogowaniu
 onAuthStateChanged(auth, (user) => {
   if (user && user.uid === ADMIN_UID) {
     document.getElementById("loginForm").style.display = "none";
@@ -77,6 +82,7 @@ onAuthStateChanged(auth, (user) => {
   }
 });
 
+// Generowanie tokenów
 document.getElementById("genBtn").onclick = async () => {
   const count = Number(document.getElementById("count").value);
   if (isNaN(count) || count < 1 || count > 500) return alert("Wprowadź liczbę tokenów (1-500)");
@@ -92,7 +98,7 @@ document.getElementById("genBtn").onclick = async () => {
     }
     const link = TOKEN_PREFIX + encodeURIComponent(token);
     output.push(link);
-    updates[token] = false; // boolean false
+    updates[token] = false; // token nieużyty
   }
 
   try {
