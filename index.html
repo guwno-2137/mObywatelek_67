@@ -1,24 +1,23 @@
 <!DOCTYPE html>
-<html lang="pl">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>Sprawdzenie Tokenu</title>
-<style>
-body { font-family: Arial; background:#111; color:#fff; text-align:center; margin-top:80px; }
-.ok { color:#0f0; font-size:22px; }
-.fail { color:#f33; font-size:22px; }
-#status { margin-top:30px; font-size:18px; background:#222; display:inline-block; padding:20px; border-radius:12px; min-width:320px; white-space:pre-wrap; text-align:left; }
-</style>
+  <meta charset="UTF-8">
+  <title>Sprawdzenie Tokenu</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin-top: 50px; }
+    .ok { color: green; font-size: 24px; }
+    .fail { color: red; font-size: 24px; }
+  </style>
 </head>
 <body>
-<h1>Sprawdzenie tokenu</h1>
-<div id="status">Ładowanie...</div>
+  <h1>Sprawdzenie tokenu</h1>
+  <div id="status">Ładowanie...</div>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
-import { getDatabase, ref, runTransaction, get } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+import { getDatabase, ref, get, update } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-database.js";
 
-// 🔑 KONFIGURACJA FIREBASE
+// === KONFIGURACJA FIREBASE (TA SAMO BAZA CO ADMIN.HTML) ===
 const firebaseConfig = {
   apiKey: "AIzaSyC7jjcojlIoiXXflxpUT5ncu33jDF7p60k",
   authDomain: "bywatel-eb940.firebaseapp.com",
@@ -32,54 +31,38 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+
 const statusEl = document.getElementById("status");
-
-// pobranie tokenu z URL
 const params = new URLSearchParams(window.location.search);
-let token = params.get("token");
+const token = params.get("token");
 
-function show(msg, isError = false) {
-  statusEl.innerText = msg;
-  statusEl.className = isError ? "fail" : "ok";
-}
-
-// funkcja do bezpiecznego klucza Firebase
-function safeKey(str) {
-  return btoa(str).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-}
-
-(async () => {
-  if (!token) { show("Brak tokenu w linku! ❌", true); return; }
-
-  const decoded = decodeURIComponent(token).trim();
-  const key = safeKey(decoded);
-  const tokenRef = ref(db, "tokens/" + key);
-
-  try {
-    const snap = await get(tokenRef);
-    if (!snap.exists()) { 
-      show("Token nie istnieje ❌", true); 
-      return; 
-    }
-
-    const result = await runTransaction(tokenRef, (currentValue) => {
-      if (!currentValue) return; // token nie istnieje
-      if (currentValue.used) return; // token już użyty
-      return { ...currentValue, used: true }; // oznaczamy jako użyty
-    });
-
-    if (!result.committed) {
-      show("Token już użyty ❌", true);
+if (!token) {
+  statusEl.innerHTML = '<span class="fail">Brak tokenu w linku!</span>';
+} else {
+  const tokenRef = ref(db, "tokens/" + token);
+  get(tokenRef).then(snapshot => {
+    const data = snapshot.val();
+    if (!snapshot.exists()) {
+      statusEl.innerHTML = '<span class="fail">Token nie istnieje ❌</span>';
+    } else if (data.used === true) {
+      statusEl.innerHTML = '<span class="fail">Token już użyty ❌</span>';
     } else {
-      show("Token poprawny ✅ Przekierowanie za 1s...");
-      setTimeout(() => window.location.href = "przekierowanie.html", 1000);
+      // oznaczamy token jako użyty
+      update(tokenRef, { used: true }).then(() => {
+        statusEl.innerHTML = '<span class="ok">Token poprawny ✅ Przekierowanie...</span>';
+        setTimeout(() => {
+          window.location.href = "przekierowanie.html";
+        }, 1000);
+      }).catch(err => {
+        console.error(err);
+        statusEl.innerHTML = '<span class="fail">Błąd przy oznaczaniu tokenu ❌</span>';
+      });
     }
-
-  } catch (err) {
+  }).catch(err => {
     console.error(err);
-    show("Błąd przy sprawdzaniu tokenu ❌", true);
-  }
-})();
+    statusEl.innerHTML = '<span class="fail">Błąd przy sprawdzaniu tokenu ❌</span>';
+  });
+}
 </script>
 </body>
 </html>
