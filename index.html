@@ -18,7 +18,7 @@ body { font-family: Arial; background:#111; color:#fff; text-align:center; margi
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
 import { getDatabase, ref, runTransaction, get } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
 
-// 🔑 KONFIGURACJA FIREBASE – te same dane co w admin.html
+// 🔑 KONFIGURACJA FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyC7jjcojlIoiXXflxpUT5ncu33jDF7p60k",
   authDomain: "bywatel-eb940.firebaseapp.com",
@@ -53,21 +53,18 @@ function safeKey(str) {
 
   const decoded = decodeURIComponent(token).trim();
   const key = safeKey(decoded);
-
   const tokenRef = ref(db, "tokens/" + key);
 
   try {
-    // sprawdzenie, czy token istnieje
     const snap = await get(tokenRef);
     if (!snap.exists()) { 
       show("Token nie istnieje ❌", true); 
       return; 
     }
 
-    // transakcja oznaczająca token jako użyty
     const result = await runTransaction(tokenRef, (currentValue) => {
-      if (!currentValue) return;             // token nie istnieje
-      if (currentValue.used) return;         // token już użyty
+      if (!currentValue) return; // token nie istnieje
+      if (currentValue.used) return; // token już użyty
       return { ...currentValue, used: true }; // oznaczamy jako użyty
     });
 
